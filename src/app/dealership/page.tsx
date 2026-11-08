@@ -103,6 +103,11 @@ export default function DealershipPage() {
                       {b.category.toUpperCase()}
                     </span>
                   </div>
+                  {b.classOf && (
+                    <div style={{ color: "#8b93a7", fontSize: 12, marginTop: 4 }}>
+                      Based on: {b.classOf}
+                    </div>
+                  )}
                   <div className="stat-grid" style={{ margin: "12px 0" }}>
                     <div>Seats<br /><b>{b.seatCapacity}</b></div>
                     <div>Top speed<br /><b>{b.topSpeedKph} km/h</b></div>

@@ -31,6 +31,7 @@ export interface BusSpec {
   heightM: number;
   price: number;
   topSpeedKph: number;
+  classOf?: string; // real-life vehicle class this model is based on
 }
 
 /** Starter bus: a classic Indian city bus. */
@@ -50,9 +51,10 @@ export const STARTER_BUS: BusSpec = {
   seatCapacity: 41,
   lengthM: 10.5,
   widthM: 2.55,
-  heightM: 3.2,
+  heightM: 3.37,
   price: 0,
   topSpeedKph: 88,
+  classOf: "Tata Starbus Ultra LB step-entry (10.5 m)",
 };
 
 /** Simple torque curve: parabola peaking at 1600 rpm. */

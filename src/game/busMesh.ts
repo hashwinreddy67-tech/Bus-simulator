@@ -75,13 +75,26 @@ export class BusVisual {
     const bodyH = H * 0.74;
     const bodyY = floorY + bodyH / 2 - 0.18;
 
+    // real-life livery classes (fictional brands, authentic paint schemes)
+    const LIVERY: Record<string, [number, number]> = {
+      // upper body / lower skirt + strip
+      "City Bus": [0xe8a80c, 0xf2ede1],
+      "Mini/Midi_bus": [0xe8e8e6, 0xf2ede1],
+      "Luxury Coach": [0xe8e8e6, 0x22507e],
+      "Sleeper Bus": [0xd8dbe0, 0x5a1a2e],
+      "School Bus": [0xf7c600, 0xf7c600],
+      "Double Decker": [0x246b3f, 0x246b3f],
+      "Electric Bus": [0xbfe3d0, 0xbfe3d0],
+    };
+    const [topColor, lowColor] = LIVERY[spec.category] ?? [0xe8a80c, 0xf2ede1];
+
     const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0xe8a80c,
+      color: topColor,
       metalness: 0.45,
       roughness: 0.32,
     });
     const lowerMat = new THREE.MeshStandardMaterial({
-      color: 0xf2ede1,
+      color: lowColor,
       metalness: 0.3,
       roughness: 0.5,
     });
@@ -148,23 +161,61 @@ export class BusVisual {
     const paneCount = 6;
     const span = L * 0.8;
     const paneLen = span / paneCount - 0.18;
+    const isDecker = spec.category === "Double Decker";
+    const rows: number[] = isDecker
+      ? [winY, winY + 1.42]
+      : [winY];
     for (const side of [-1, 1]) {
-      for (let i = 0; i < paneCount; i++) {
-        const z = L / 2 - L * 0.1 - (i + 0.5) * (span / paneCount);
-        const pane = new THREE.Mesh(
-          new THREE.BoxGeometry(0.05, winH, paneLen),
-          glassMat,
-        );
-        pane.position.set(side * (W / 2 + 0.01), winY, z);
-        this.bodyGroup.add(pane);
+      for (const rowY of rows) {
+        for (let i = 0; i < paneCount; i++) {
+          const z = L / 2 - L * 0.1 - (i + 0.5) * (span / paneCount);
+          const pane = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05, winH, paneLen),
+            glassMat,
+          );
+          pane.position.set(side * (W / 2 + 0.01), rowY, z);
+          this.bodyGroup.add(pane);
+        }
       }
       // side pillar cover strip
       const pillar = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, bodyH * 0.55, span + 0.3),
+        new THREE.BoxGeometry(0.04, (isDecker ? bodyH * 0.85 : bodyH * 0.55), span + 0.3),
         bodyMat,
       );
       pillar.position.set(side * (W / 2 + 0.005), bodyY + 0.1, 0);
       this.bodyGroup.add(pillar);
+    }
+
+    // sleeper class: dark berth band along the side (curtains)
+    if (spec.category === "Sleeper Bus") {
+      for (const side of [-1, 1]) {
+        const band = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, winH * 0.55, span + 0.2),
+          new THREE.MeshStandardMaterial({ color: 0x5a1a2e, roughness: 0.85 }),
+        );
+        band.position.set(side * (W / 2 + 0.02), winY - winH * 0.55, 0);
+        this.bodyGroup.add(band);
+      }
+    }
+
+    // school class: black "SCHOOL BUS" band on both sides
+    if (spec.category === "School Bus") {
+      const tex = makeTextTexture("SCHOOL BUS", {
+        bg: "#f7c600",
+        fg: "#111111",
+        w: 512,
+        h: 80,
+        font: "bold 56px 'Arial Black', Arial",
+      });
+      for (const side of [-1, 1]) {
+        const band = new THREE.Mesh(
+          new THREE.PlaneGeometry(4.6, 0.62),
+          new THREE.MeshBasicMaterial({ map: tex }),
+        );
+        band.position.set(side * (W / 2 + 0.015), floorY + 0.95, -L * 0.12);
+        band.rotation.y = side === 1 ? -Math.PI / 2 : Math.PI / 2;
+        this.bodyGroup.add(band);
+      }
     }
 
     // ---- destination board (LED) ----
@@ -449,15 +500,15 @@ export class BusVisual {
     cabin.add(driverSeat);
 
     // 2+2 instanced passenger seats
-    const rows = Math.floor((L * 0.72) / 1.05);
-    const seatCount = rows * 2;
+    const seatRows = Math.floor((L * 0.72) / 1.05);
+    const seatCount = seatRows * 2;
     const seatMat = new THREE.MeshStandardMaterial({ color: 0x37437a, roughness: 0.9 });
     const seats = new THREE.InstancedMesh(new THREE.BoxGeometry(0.45, 0.5, 0.48), seatMat, seatCount);
     const backs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.45, 0.55, 0.09), seatMat, seatCount);
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     let si = 0;
-    for (let r = 0; r < rows; r++) {
+    for (let r = 0; r < seatRows; r++) {
       for (const seatX of [-W * 0.28 + 0.32, W * 0.28]) {
         const z = L * 0.36 - 2.2 - r * 1.05;
         m.compose(new THREE.Vector3(seatX, floorY + 0.62, z), q, new THREE.Vector3(1, 1, 1));
