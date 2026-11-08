@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ROAD_CENTER_RADIUS, STOP_COUNT, stopAngle } from "./world";
+import { ROAD_CENTER_RADIUS, ROAD_HALF_WIDTH, STOP_COUNT, stopAngle } from "./world";
 
 /**
  * Phase 3 passenger + ticketing simulation.
@@ -58,11 +58,11 @@ export class PassengerSystem {
       // deterministic per-passenger jitter
       for (let p = 0; p < 10; p++) {
         const a0 = Math.random() * Math.PI * 2;
-        const r0 = Math.random() * 1.6;
+        const r0 = Math.random() * 0.8;
         this.jitter.push({ x: Math.sin(a0) * r0, z: Math.cos(a0) * r0 });
         const a = stopAngle(s);
         // place on the outer shoulder beside the shelter, oriented to the road
-        const sr = ROAD_CENTER_RADIUS - 11.5; // inner footpath side (avoids driving lane)
+        const sr = ROAD_CENTER_RADIUS - ROAD_HALF_WIDTH - 1.0; // kerbside by the stop
         const px = Math.sin(a) * sr + Math.sin(a) * this.jitter[i].x;
         const pz = Math.cos(a) * sr + Math.cos(a) * this.jitter[i].z;
         // cyl local axes: y up — set position only, rotation via lookAt-ish yaw

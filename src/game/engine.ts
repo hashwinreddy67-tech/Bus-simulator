@@ -8,6 +8,8 @@ import {
   buildWorld,
   ROAD_CENTER_RADIUS,
   ROAD_HALF_WIDTH,
+  GRASS_INNER,
+  GRASS_OUTER,
   type World,
 } from "./world";
 import {
@@ -271,8 +273,18 @@ export class GameEngine {
     // traffic AI
     this.traffic.isNight = lightsOn;
     this.traffic.update(dt, st.x, st.z, st.speed);
-    if (this.traffic.collidePlayer(st.x, st.z)) {
-      st.speed *= 0.4; // rough grazing rule; contact resolution in Phase 8
+    const contact = this.traffic.collidePlayerBus(
+      st.x,
+      st.z,
+      st.heading,
+      this.bus.spec.lengthM / 2,
+      this.bus.spec.widthM / 2,
+    );
+    if (contact) {
+      // resolve at surface: bus touches the vehicle, pushed out of overlap
+      st.x += contact.pushX;
+      st.z += contact.pushZ;
+      st.speed *= 0.9;
     }
 
     // rain particles follow the player
@@ -384,14 +396,18 @@ export class GameEngine {
   private clampToCorridor() {
     const st = this.bus.state;
     const d = Math.hypot(st.x, st.z);
-    const lo = ROAD_CENTER_RADIUS - ROAD_HALF_WIDTH - 5;
-    const hi = ROAD_CENTER_RADIUS + ROAD_HALF_WIDTH + 5;
+    // clamp right AT the guardrails (rail radius = GRASS band edge),
+    // allowing the grass shoulder: the bus touches the rail instead of
+    // stopping metres short of it
+    const busHalfW = this.bus.spec.widthM / 2 + 0.2;
+    const lo = GRASS_INNER + 1 + busHalfW;   // inner rail at GRASS_INNER + 1
+    const hi = GRASS_OUTER - 1 - busHalfW;   // outer rail at GRASS_OUTER - 1
     if (d < lo || d > hi) {
       const ang = Math.atan2(st.x, st.z);
       const clamped = Math.min(hi, Math.max(lo, d));
       st.x = Math.sin(ang) * clamped;
       st.z = Math.cos(ang) * clamped;
-      st.speed *= 0.4;
+      st.speed *= 0.985; // rub the rail, don't teleport-stop
     }
   }
 

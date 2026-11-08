@@ -422,12 +422,12 @@ export class TrafficSystem {
         obstacleSpeed = Math.abs(playerSpeed);
       }
 
-      // desired speed vs obstacle
-      const safeGap = 6 + v.speed * 0.9;
+      // desired speed vs obstacle — realistic car-following: queue tightly
+      const safeGap = 2.2 + v.speed * 0.55;
       let target = v.targetSpeed;
       if (gapToObstacle < safeGap) {
         target = Math.min(target, Math.max(0, obstacleSpeed - 1));
-        if (gapToObstacle < 5) target = 0;
+        if (gapToObstacle < 1.6) target = 0; // stop ~1.6 m behind the obstacle
       }
 
       // accelerate/brake toward target (car-like response, brakes faster)
@@ -446,15 +446,46 @@ export class TrafficSystem {
     }
   }
 
-  /** Circle-approx collision test against the player bus. */
-  collidePlayer(playerX: number, playerZ: number): { x: number; z: number } | null {
+  /**
+   * Oriented-box collision: the bus is treated as its true OBB (length, width,
+   * heading); each traffic vehicle is a circle of its footprint radius.
+   * Returns the push vector needed to resolve contact, so the bus physically
+   * touches the obstacle instead of stopping metres short.
+   */
+  collidePlayerBus(
+    playerX: number,
+    playerZ: number,
+    playerHeading: number,
+    busHalfLength: number,
+    busHalfWidth: number,
+  ): { pushX: number; pushZ: number } | null {
+    const sinH = Math.sin(playerHeading);
+    const cosH = Math.cos(playerHeading);
     for (const v of this.vehicles) {
       const dx = v.group.position.x - playerX;
       const dz = v.group.position.z - playerZ;
-      const d = Math.hypot(dx, dz);
-      const overlap = (v.lengthM + 10.5) * 0.42;
-      if (d < overlap) {
-        return { x: dx, z: dz };
+      // early-out: ignore anything farther than bus length + vehicle length
+      if (dx * dx + dz * dz > (busHalfLength * 2 + v.lengthM) ** 2) continue;
+
+      // vehicle centre in bus-local coordinates
+      const localZ = dx * sinH + dz * cosH;   // along bus forward axis
+      const localX = dx * cosH - dz * sinH;   // across bus width
+      const clampX = Math.max(-busHalfWidth, Math.min(busHalfWidth, localX));
+      const clampZ = Math.max(-busHalfLength, Math.min(busHalfLength, localZ));
+
+      // closest point on the bus box in world space
+      const nearX = playerX + sinH * clampZ + cosH * clampX;
+      const nearZ = playerZ + cosH * clampZ - sinH * clampX;
+      const rad = Math.max(0.9, v.lengthM * 0.32);
+      const dist = Math.hypot(v.group.position.x - nearX, v.group.position.z - nearZ);
+      if (dist < rad) {
+        const depth = rad - dist;
+        let nx = v.group.position.x - nearX;
+        let nz = v.group.position.z - nearZ;
+        const len = Math.hypot(nx, nz) || 1;
+        nx /= len;
+        nz /= len;
+        return { pushX: nx * depth, pushZ: nz * depth };
       }
     }
     return null;
