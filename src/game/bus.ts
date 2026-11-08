@@ -158,6 +158,7 @@ export class BusVehicle {
     cruiseTargetKph: number | null,
     onSurface: "road" | "grass" = "road",
     doorsOpen = false,
+    wet = 0,
   ) {
     const s = this.state;
     const spec = this.spec;
@@ -208,7 +209,8 @@ export class BusVehicle {
       const shiftDip = this.shiftCut > 0 ? 0 : 1; // clutch-to-clutch pressure dip
       const maxWheelTorque =
         T * ratio * spec.finalDrive * 0.9 * throttleIn * rpmFactor * shiftDip;
-      const driveTorqueLimit = mass * g * 0.72 * spec.wheelRadius; // traction cap
+      const driveTorqueLimit =
+        mass * g * 0.72 * (1 - 0.18 * wet) * spec.wheelRadius; // traction cap, reduced when wet
       wheelTorque = Math.sign(
         s.gearMode === "R" ? 1 : -1,
       ) === 1 && s.gearMode === "R"
@@ -226,7 +228,9 @@ export class BusVehicle {
 
     // braking with air-brake servo lag + ABS modulation at high decel
     this.brakeServo += ((brake > 0.05 || handbrake ? 1 : 0) - this.brakeServo) * Math.min(1, dt * 4);
-    const brakeForce = brake * this.brakeServo * mass * g * (onSurface === "road" ? 0.62 : 0.3);
+    const brakeForce =
+      brake * this.brakeServo * mass * g *
+      (onSurface === "road" ? 0.62 * (1 - 0.3 * wet) : 0.3); // wet roads brake worse
     const handbrakeForce = handbrake ? mass * g * 0.35 : 0;
     const absLimit = mass * g * 0.75;
     const totalBrake = Math.min(brakeForce + handbrakeForce, absLimit);
@@ -237,7 +241,7 @@ export class BusVehicle {
     }
 
     // resistances
-    const rolling = onSurface === "road" ? 0.012 : 0.05;
+    const rolling = onSurface === "road" ? 0.012 + 0.02 * wet : 0.05;
     const dragC = 3.5; // approximates ½·ρ·Cd·A for a full-size bus
     const airDrag = dragC * s.speed * s.speed * 0.5 * 1.2;
     const rollResist = rolling * mass * g * Math.sign(s.speed || 0);

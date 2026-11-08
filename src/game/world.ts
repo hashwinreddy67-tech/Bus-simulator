@@ -23,6 +23,7 @@ export interface World {
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   sky: THREE.Mesh;
+  fuelPumpAngles: number[];
 }
 
 // Deterministic LCG so the world is identical every session.
@@ -313,6 +314,67 @@ export function buildWorld(scene: THREE.Scene): World {
     group.add(stop);
   }
 
+  // ---- fuel stations: canopy + pumps + I-can-refuel signage at 2 angles ----
+  const fuelPumpAngles = [1.5, 4.0];
+  for (const fa of fuelPumpAngles) {
+    const fr = ROAD_CENTER_RADIUS - ROAD_HALF_WIDTH - 4; // inner shoulder, service side
+    const station = new THREE.Group();
+    // canopy
+    const canopy = new THREE.Mesh(
+      new THREE.BoxGeometry(9, 0.35, 6),
+      new THREE.MeshStandardMaterial({ color: 0xdfe3e6, roughness: 0.6 }),
+    );
+    canopy.position.y = 4.6;
+    station.add(canopy);
+    for (const off of [-3.5, 3.5]) {
+      const post = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.16, 4.4, 8),
+        new THREE.MeshStandardMaterial({ color: 0xb6bcc2, metalness: 0.5 }),
+      );
+      post.position.set(off, 2.2, 0);
+      station.add(post);
+    }
+    // pump island
+    const island = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 0.18, 5.5),
+      new THREE.MeshStandardMaterial({ color: 0x585d63 }),
+    );
+    island.position.set(0, 0.09, 0);
+    station.add(island);
+    for (const off of [-1.4, 1.4]) {
+      const pump = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 1.3, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0xc23b22, roughness: 0.5 }),
+      );
+      pump.position.set(0, 0.85, off);
+      station.add(pump);
+      const face = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.4, 0.03),
+        new THREE.MeshBasicMaterial({ color: 0x1b1d20 }),
+      );
+      face.position.set(0.36, 1.0, off);
+      station.add(face);
+    }
+    // sign totem: "DIESEL ₹92.14"
+    const signTex = makeSignTexture("FUEL · ₹92/L");
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 0.9),
+      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide }),
+    );
+    sign.position.set(4.6, 5.6, 0);
+    const signPost = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.09, 5.2, 6),
+      new THREE.MeshStandardMaterial({ color: 0x44484d }),
+    );
+    signPost.position.set(4.6, 2.6, 0);
+    station.add(sign, signPost);
+
+    station.position.set(Math.sin(fa) * fr, 0, Math.cos(fa) * fr);
+    station.lookAt(0, 0, 0);
+    station.position.y = 0;
+    group.add(station);
+  }
+
   // ---- sky + lighting ----
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(1400, 32, 16),
@@ -337,5 +399,25 @@ export function buildWorld(scene: THREE.Scene): World {
   group.add(sun);
   group.add(sun.target);
 
-  return { group, lampHeads, sun, hemi, sky };
+  return { group, lampHeads, sun, hemi, sky, fuelPumpAngles };
+}
+
+function makeSignTexture(text: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 192;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#0e2338";
+  ctx.fillRect(0, 0, 512, 192);
+  ctx.strokeStyle = "#e8b62e";
+  ctx.lineWidth = 10;
+  ctx.strokeRect(6, 6, 500, 180);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 64px 'Segoe UI', Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 256, 96);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  return tex;
 }

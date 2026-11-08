@@ -12,6 +12,7 @@ export class EngineAudio {
   private gain: GainNode | null = null;
   private noiseGain: GainNode | null = null;
   private master: GainNode | null = null;
+  private rainGain: GainNode | null = null;
   private volume = 0.6;
   private running = false;
 
@@ -58,6 +59,18 @@ export class EngineAudio {
     src.connect(filter).connect(this.noiseGain).connect(this.master);
     src.start();
 
+    // rain hiss layer (independent of road noise)
+    const rainSrc = ctx.createBufferSource();
+    rainSrc.buffer = buf;
+    rainSrc.loop = true;
+    const rainFilter = ctx.createBiquadFilter();
+    rainFilter.type = "highpass";
+    rainFilter.frequency.value = 1400;
+    this.rainGain = ctx.createGain();
+    this.rainGain.gain.value = 0;
+    rainSrc.connect(rainFilter).connect(this.rainGain).connect(this.master);
+    rainSrc.start();
+
     this.running = true;
   }
 
@@ -75,6 +88,16 @@ export class EngineAudio {
     this.volume = v;
     if (this.master && this.ctx) {
       this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  setRain(intensity: number) {
+    if (this.rainGain && this.ctx) {
+      this.rainGain.gain.setTargetAtTime(
+        Math.min(0.16, intensity * 0.16),
+        this.ctx.currentTime,
+        0.4,
+      );
     }
   }
 

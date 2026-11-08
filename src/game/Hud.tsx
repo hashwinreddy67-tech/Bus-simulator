@@ -93,8 +93,13 @@ export default function Hud() {
           <div style={{ marginBottom: 4, letterSpacing: "0.1em" }}>CONTROLS</div>
           W/S drive · A/D steer · SPACE handbrake · R reverse<br />
           G engine · L lights · K horn · X cruise · O doors<br />
-          Z/V indicators · T wipers · C camera · B reset · ESC pause<br />
-          Doors auto-lock while moving — danger!
+          Z/V indicators · T wipers · F refuel · C camera · ESC pause<br />
+          {te.weather !== "clear" && (
+            <span style={{ color: "#89c4f4" }}>
+              ☔ {te.weather.toUpperCase()}
+              {te.refueling ? " · DISPENSING… (F to stop)" : ""}
+            </span>
+          )}
         </div>
 
         <div className="hud-card" style={{ minWidth: 220 }}>
@@ -143,6 +148,35 @@ export default function Hud() {
           </div>
         </div>
       </div>
+
+      {/* refuel prompt */}
+      {te.pumpArcM < 60 && (
+        <div
+          style={{
+            position: "fixed",
+            top: 100,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: te.canRefuel ? "rgba(178,60,32,0.92)" : "var(--panel)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            padding: "8px 18px",
+            borderRadius: 8,
+            fontSize: 13,
+            zIndex: 15,
+            pointerEvents: "none",
+          }}
+        >
+          {te.canRefuel
+            ? `⛽ AT PUMP · ${
+                te.engineOn
+                  ? "SWITCH ENGINE OFF (G), THEN PRESS F"
+                  : te.refueling
+                    ? "DISPENSING ₹92/L · F to stop"
+                    : "PRESS F TO REFUEL"
+              }`
+            : `⛽ Fuel pump ${(te.pumpArcM / 1000).toFixed(1)} km ahead`}
+        </div>
+      )}
 
       {/* stop service prompt */}
       <div

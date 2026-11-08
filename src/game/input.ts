@@ -18,6 +18,7 @@ export interface InputState {
   wipers: boolean;
   doors: boolean;
   cruise: boolean;
+  refuelToggle: boolean;
   indicatorLeft: boolean;
   indicatorRight: boolean;
   cameraNext: boolean;
@@ -39,6 +40,7 @@ export class InputManager {
     wipers: false,
     doors: false,
     cruise: false,
+    refuelToggle: false,
     indicatorLeft: false,
     indicatorRight: false,
     cameraNext: false,
@@ -105,6 +107,10 @@ export class InputManager {
         if (this.state.indicatorRight) this.state.indicatorLeft = false;
         this.onAction?.("indRight");
         break;
+      case "KeyF":
+        this.state.refuelToggle = !this.state.refuelToggle;
+        this.onAction?.("refuel");
+        break;
       case "KeyC":
         if (e.ctrlKey) break;
         this.onAction?.("camera");
@@ -160,5 +166,6 @@ export type ActionName =
   | "horn"
   | "pause"
   | "reset"
+  | "refuel"
   | "indLeft"
   | "indRight";

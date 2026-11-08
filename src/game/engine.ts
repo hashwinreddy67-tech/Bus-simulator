@@ -18,6 +18,7 @@ import {
 import { InputManager, type ActionName } from "./input";
 import { EngineAudio } from "./audio";
 import { PassengerSystem } from "./passengers";
+import { WeatherSystem } from "./weather";
 import { useGame } from "./state";
 
 export interface EngineCallbacks {
@@ -41,6 +42,21 @@ export class GameEngine {
   private boardAcc = { value: 0 };
   private revenueFlush = 0;
   private teService = { arcM: 1e9, waiting: 0, inPosition: false };
+
+  private nearestPump(x: number, z: number): { arcM: number } {
+    const ang = Math.atan2(x, z);
+    let bestArc = Infinity;
+    for (const a of this.world.fuelPumpAngles) {
+      let d = Math.abs(ang - a);
+      d = ((d % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      if (d > Math.PI) d = Math.PI * 2 - d;
+      bestArc = Math.min(bestArc, d * ROAD_CENTER_RADIUS);
+    }
+    return { arcM: bestArc };
+  }
+  private weather!: WeatherSystem;
+  private refuelCostAcc = 0;
+  private refuelTime = 0;
   private input: InputManager;
   private audio = new EngineAudio();
   private raf = 0;
@@ -85,6 +101,7 @@ export class GameEngine {
     this.scene.fog = new THREE.Fog(0x9cb8d8, 320, 1500);
 
     this.world = buildWorld(this.scene);
+    this.weather = new WeatherSystem(this.scene);
     this.passengers = new PassengerSystem(this.world.group);
     this.passengers.seed();
     this.traffic = new TrafficSystem(this.scene, 34);
@@ -209,6 +226,7 @@ export class GameEngine {
         inp.cruise ? 60 : null,
         surface === "grass" ? "grass" : "road",
         doorsOpen,
+        this.weather.wetLevel,
       );
       this.acc -= step;
     }
@@ -216,6 +234,9 @@ export class GameEngine {
     // clock
     this.clockHours = (this.clockHours + dt * (this.clockSpeed / 3600)) % 24;
     const dayT = this.clockHours;
+
+    // weather particles (after player state is available)
+    this.audio.setRain(this.weather.wetLevel);
 
     // lighting + fog by time of day
     this.updateDayNight(dayT, dt);
@@ -235,7 +256,8 @@ export class GameEngine {
     this.busMesh.applyBodyLean(yawRate * st.speed, longAccel);
 
     // lights
-    const lightsOn = st.engineOn && (dayT > 18.5 || dayT < 6.3);
+    const lightsOn =
+      st.engineOn && (dayT > 18.5 || dayT < 6.3 || this.weather.raining);
     this.busMesh.setLights(
       lightsOn,
       inp.brake > 0.05 || inp.handbrake,
@@ -252,6 +274,9 @@ export class GameEngine {
     if (this.traffic.collidePlayer(st.x, st.z)) {
       st.speed *= 0.4; // rough grazing rule; contact resolution in Phase 8
     }
+
+    // rain particles follow the player
+    this.weather.update(dt, st.x, 0, st.z);
 
     // ---- passenger service (Phase 3) ----
     const nearest = PassengerSystem.nearestStop(st.x, st.z);
@@ -273,6 +298,33 @@ export class GameEngine {
       const earned = Math.floor(this.revenueFlush);
       this.revenueFlush -= earned;
       useGame.getState().earn(earned, true);
+    }
+
+    // ---- refuelling (Phase 4) ----
+    const pump = this.nearestPump(st.x, st.z);
+    const canRefuel = pump.arcM < 15 && Math.abs(st.speed) < 0.5;
+    const dispenserActive =
+      canRefuel &&
+      this.input.state.refuelToggle &&
+      !st.engineOn && // engine OFF at the pump — safety first
+      st.fuelLiters < this.bus.spec.tankLiters;
+    if (dispenserActive) {
+      // ₹92.14/L (diesel); charge real balance, cap at tank + money
+      const money = useGame.getState().money;
+      if (money < this.refuelCostAcc + 92.14) {
+        this.input.state.refuelToggle = false; // balance empty — stop dispensing
+      } else {
+        const liters = Math.min(7 * dt, this.bus.spec.tankLiters - st.fuelLiters);
+        st.fuelLiters += liters;
+        this.refuelCostAcc += liters * 92.14;
+      }
+    } else if (canRefuel) {
+      this.refuelCostAcc = 0;
+    }
+    if (this.refuelCostAcc >= 5) {
+      const cost = Math.floor(this.refuelCostAcc);
+      this.refuelCostAcc -= cost;
+      useGame.getState().earn(-cost, false);
     }
 
     // camera
@@ -309,6 +361,10 @@ export class GameEngine {
     te.stopArcM = this.teService.arcM;
     te.stopWaiting = this.teService.waiting;
     te.canService = this.teService.inPosition;
+    te.pumpArcM = pump.arcM;
+    te.canRefuel = canRefuel;
+    te.refueling = dispenserActive;
+    te.weather = this.weather.state;
 
     this.cb.onTripProgress(st.tripDistance, this.bestSpeed);
 
@@ -355,9 +411,9 @@ export class GameEngine {
     const night = Math.max(0, -daylight * 4);
     const dayI = Math.max(0.06, Math.min(1, daylight * 1.4));
 
-    this.world.sun.intensity = 2.4 * dayI;
+    this.world.sun.intensity = 2.4 * dayI * (1 - 0.55 * this.weather.wetLevel);
     this.world.sun.color.setHSL(0.09, 0.6, 0.45 + 0.45 * Math.min(1, daylight * 2));
-    this.world.hemi.intensity = 0.25 + 0.75 * dayI;
+    this.world.hemi.intensity = 0.25 + 0.75 * dayI * (1 - 0.3 * this.weather.wetLevel);
 
     // sky + fog colour
     const skyDay = new THREE.Color(0x87b7e8);
@@ -376,9 +432,15 @@ export class GameEngine {
       const f = 1 - Math.min(1, Math.abs(hours - (hours < 12 ? 7 : 17.5)) / 1);
       c.lerp(skyDusk, 0.35 * f);
     }
-    (this.world.sky.material as THREE.MeshBasicMaterial).color.copy(c);
-    (this.scene.fog as THREE.Fog).color.copy(c);
-    (this.scene.fog as THREE.Fog).near = skyNight.equals(c) ? 200 : 320;
+    (this.world.sky.material as THREE.MeshBasicMaterial).color.copy(c).lerp(
+      new THREE.Color(0x8e97a3),
+      this.weather.wetLevel * 0.6,
+    );
+    (this.scene.fog as THREE.Fog).color.copy(c).lerp(
+      new THREE.Color(0x8e97a3),
+      this.weather.wetLevel * 0.6,
+    );
+    (this.scene.fog as THREE.Fog).near = 320 - 210 * this.weather.wetLevel;
 
     // lamp glow at night
     (this.world.lampHeads.material as THREE.MeshBasicMaterial).color.setHex(

@@ -13,6 +13,8 @@ export interface Telemetry {
   engineOn: boolean;
   horn: boolean;
   cruise: boolean;
+  refueling: boolean;
+  weather: string;
   clockHours: number; // 0..24
   tripDistanceM: number;
   camera: string;
@@ -24,6 +26,8 @@ export interface Telemetry {
   stopWaiting: number; // crowd waiting there
   canService: boolean; // bus in position to board/alight
   revenueBoarding: number; // live cash from this service action
+  pumpArcM: number; // metres to nearest fuel pump
+  canRefuel: boolean;
 }
 
 export const telemetry: Telemetry = {
@@ -40,6 +44,8 @@ export const telemetry: Telemetry = {
   engineOn: true,
   horn: false,
   cruise: false,
+  refueling: false,
+  weather: "clear",
   clockHours: 8,
   tripDistanceM: 0,
   camera: "Chase",
@@ -51,6 +57,8 @@ export const telemetry: Telemetry = {
   stopWaiting: 0,
   canService: false,
   revenueBoarding: 0,
+  pumpArcM: 1e9,
+  canRefuel: false,
 };
 
 export const TELEM_MAX_RPM_SHOWN = 2400;
