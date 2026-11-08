@@ -20,6 +20,10 @@ export interface Telemetry {
   x: number;
   z: number;
   heading: number;
+  stopArcM: number; // metres to nearest bus stop
+  stopWaiting: number; // crowd waiting there
+  canService: boolean; // bus in position to board/alight
+  revenueBoarding: number; // live cash from this service action
 }
 
 export const telemetry: Telemetry = {
@@ -43,6 +47,10 @@ export const telemetry: Telemetry = {
   x: 0,
   z: 0,
   heading: 0,
+  stopArcM: 1e9,
+  stopWaiting: 0,
+  canService: false,
+  revenueBoarding: 0,
 };
 
 export const TELEM_MAX_RPM_SHOWN = 2400;

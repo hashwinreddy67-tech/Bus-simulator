@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { GameEngine } from "@/game/engine";
 import { telemetry } from "@/game/telemetry";
 import { useGame } from "@/game/state";
+import { getBusSpec } from "@/game/buses";
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +32,7 @@ export default function GameCanvas() {
         renderScale: store.settings.renderScale,
         steeringSensitivity: store.settings.steeringSensitivity,
         sfxVolume: store.settings.sfxVolume,
+        busSpec: getBusSpec(store.activeBusId),
       },
     );
     engineRef.current = engine;

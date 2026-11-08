@@ -144,6 +144,28 @@ export default function Hud() {
         </div>
       </div>
 
+      {/* stop service prompt */}
+      <div
+        style={{
+          position: "fixed",
+          top: 64,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: te.stopArcM > 400 ? "none" : "block",
+          background: te.canService ? "rgba(46,125,79,0.92)" : "var(--panel)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          padding: "8px 18px",
+          borderRadius: 8,
+          fontSize: 13,
+          zIndex: 15,
+          pointerEvents: "none",
+        }}
+      >
+        {te.canService
+          ? `🚏 STOP READY · ${te.stopWaiting} waiting · PRESS O TO OPEN DOORS & SELL TICKETS`
+          : `🚏 Next stop ${te.stopArcM > 150 ? `${(te.stopArcM / 1000).toFixed(1)} km` : `${Math.round(te.stopArcM)} m`} · ${te.stopWaiting} waiting`}
+      </div>
+
       {paused === false && te.fuelPct < 12 && (
         <div
           style={{

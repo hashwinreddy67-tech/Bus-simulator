@@ -11,6 +11,12 @@ export const ROAD_HALF_WIDTH = 9; // 18 m carriageway (2 lanes each direction)
 export const GRASS_INNER = ROAD_CENTER_RADIUS - ROAD_HALF_WIDTH - 6;
 export const GRASS_OUTER = ROAD_CENTER_RADIUS + ROAD_HALF_WIDTH + 6;
 
+/** Bus stop support: shelter at predefined ring angles (functional in Phase 3). */
+export const STOP_COUNT = 8;
+export function stopAngle(i: number): number {
+  return (i / STOP_COUNT) * Math.PI * 2 + 0.3;
+}
+
 export interface World {
   group: THREE.Group;
   lampHeads: THREE.InstancedMesh;
@@ -253,23 +259,59 @@ export function buildWorld(scene: THREE.Scene): World {
   group.add(trunks);
   group.add(crowns);
 
-  // ---- bus stop bay (functional stop logic lands in Phase 3) ----
-  const stopSign = new THREE.Group();
-  const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.06, 3, 6),
-    new THREE.MeshStandardMaterial({ color: 0x37507a }),
-  );
-  pole.position.y = 1.5;
-  const board = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 0.9, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0x146b3a }),
-  );
-  board.position.y = 2.6;
-  stopSign.add(pole, board);
-  const sr = ROAD_CENTER_RADIUS + ROAD_HALF_WIDTH + 4;
-  stopSign.position.set(Math.sin(0.3) * sr, 0, Math.cos(0.3) * sr);
-  stopSign.rotation.y = -0.3 + Math.PI;
-  group.add(stopSign);
+  // ---- bus stops: shelter + bench + sign at every stop angle ----
+  for (let i = 0; i < STOP_COUNT; i++) {
+    const a = stopAngle(i);
+    const sr = ROAD_CENTER_RADIUS + ROAD_HALF_WIDTH + 5;
+    const stop = new THREE.Group();
+    // shelter posts
+    for (const off of [-1.4, 1.4]) {
+      const sp = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6),
+        new THREE.MeshStandardMaterial({ color: 0x37507a }),
+      );
+      sp.position.set(off, 1.3, 0);
+      stop.add(sp);
+    }
+    // roof
+    const sroof = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 0.09, 1.7),
+      new THREE.MeshStandardMaterial({ color: 0x2a5f8f }),
+    );
+    sroof.position.set(0, 2.65, -0.1);
+    stop.add(sroof);
+    // back panel
+    const back = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 1.6, 0.07),
+      new THREE.MeshStandardMaterial({ color: 0xb4bcc4, roughness: 0.6 }),
+    );
+    back.position.set(0, 1.8, -0.85);
+    stop.add(back);
+    // bench
+    const bench = new THREE.Mesh(
+      new THREE.BoxGeometry(3.0, 0.08, 0.4),
+      new THREE.MeshStandardMaterial({ color: 0x7a4b2a }),
+    );
+    bench.position.set(0, 0.55, -0.6);
+    stop.add(bench);
+    // stop sign
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 3, 6),
+      new THREE.MeshStandardMaterial({ color: 0x37507a }),
+    );
+    pole.position.set(1.8, 1.5, 0.4);
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.9, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x146b3a }),
+    );
+    board.position.set(1.8, 2.6, 0.4);
+    stop.add(pole, board);
+
+    stop.position.set(Math.sin(a) * sr, 0, Math.cos(a) * sr);
+    stop.lookAt(0, 0, 0);
+    stop.position.y = 0;
+    group.add(stop);
+  }
 
   // ---- sky + lighting ----
   const sky = new THREE.Mesh(

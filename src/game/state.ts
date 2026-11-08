@@ -14,6 +14,8 @@ export interface SaveData {
   tripsCompleted: number;
   bestSpeedKph: number;
   totalEarnings: number;
+  ownedBuses: string[];
+  activeBusId: string;
 }
 
 export interface Settings {
@@ -30,6 +32,8 @@ export interface GameStore {
   bestSpeedKph: number;
   totalEarnings: number;
   xp: number;
+  ownedBuses: string[];
+  activeBusId: string;
   settings: Settings;
   paused: boolean;
   hasSave: boolean;
@@ -44,14 +48,21 @@ export interface GameStore {
   }) => void;
   spend: (amount: number) => boolean;
   earn: (amount: number, applyToEarnings?: boolean) => void;
+  buyBus: (id: string, price: number) => boolean;
+  sellBus: (id: string, price: number) => boolean;
+  setActiveBus: (id: string) => void;
   startNewGame: () => void;
   loadSave: () => boolean;
   saveNow: () => void;
 }
 
-const SAVE_KEY = "infinite-roads:save:v1";
+const SAVE_KEY = "infinite-roads:save:v2";
 const SETTINGS_KEY = "infinite-roads:settings:v1";
 
+import { create } from "zustand";
+import { STARTER_BUS } from "./bus";
+
+const STARTER_BUS_ID = STARTER_BUS.id;
 const START_MONEY = 5000;
 
 const defaultSave: SaveData = {
@@ -63,6 +74,8 @@ const defaultSave: SaveData = {
   tripsCompleted: 0,
   bestSpeedKph: 0,
   totalEarnings: 0,
+  ownedBuses: [STARTER_BUS_ID],
+  activeBusId: STARTER_BUS_ID,
 };
 
 function readJson<T>(key: string): T | null {
@@ -84,8 +97,6 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
-import { create } from "zustand";
-
 export const useGame = create<GameStore>((set, get) => ({
   money: START_MONEY,
   distanceMeters: 0,
@@ -93,6 +104,8 @@ export const useGame = create<GameStore>((set, get) => ({
   bestSpeedKph: 0,
   totalEarnings: 0,
   xp: 0,
+  ownedBuses: [STARTER_BUS_ID],
+  activeBusId: STARTER_BUS_ID,
   paused: false,
   hasSave: false,
   settings: {
@@ -121,6 +134,8 @@ export const useGame = create<GameStore>((set, get) => ({
       tripsCompleted: st.tripsCompleted + 1,
       bestSpeedKph: Math.max(st.bestSpeedKph, trip.bestSpeedKph),
       totalEarnings: st.totalEarnings + trip.earnings,
+      ownedBuses: st.ownedBuses,
+      activeBusId: st.activeBusId,
     };
     writeJson(SAVE_KEY, save);
     set({
@@ -131,6 +146,40 @@ export const useGame = create<GameStore>((set, get) => ({
       bestSpeedKph: save.bestSpeedKph,
       totalEarnings: save.totalEarnings,
     });
+  },
+
+  buyBus: (id, price) => {
+    const st = get();
+    if (st.ownedBuses.includes(id)) return false;
+    if (st.money < price) return false;
+    const stNew = {
+      money: st.money - price,
+      ownedBuses: [...st.ownedBuses, id],
+      activeBusId: id, // delivered to depot and ready to drive
+    };
+    set(stNew);
+    get().saveNow();
+    return true;
+  },
+
+  sellBus: (id, price) => {
+    const st = get();
+    if (!st.ownedBuses.includes(id)) return false;
+    const owned = st.ownedBuses.filter((b) => b !== id);
+    set({
+      money: st.money + price,
+      ownedBuses: owned,
+      activeBusId: st.activeBusId === id ? owned[0] ?? STARTER_BUS_ID : st.activeBusId,
+    });
+    get().saveNow();
+    return true;
+  },
+
+  setActiveBus: (id) => {
+    const st = get();
+    if (!st.ownedBuses.includes(id)) return;
+    set({ activeBusId: id });
+    get().saveNow();
   },
 
   spend: (amount) => {
@@ -157,6 +206,8 @@ export const useGame = create<GameStore>((set, get) => ({
       tripsCompleted: 0,
       bestSpeedKph: 0,
       totalEarnings: 0,
+      ownedBuses: [STARTER_BUS_ID],
+      activeBusId: STARTER_BUS_ID,
     });
   },
 
@@ -172,6 +223,8 @@ export const useGame = create<GameStore>((set, get) => ({
       tripsCompleted: save.tripsCompleted,
       bestSpeedKph: save.bestSpeedKph,
       totalEarnings: save.totalEarnings,
+      ownedBuses: save.ownedBuses?.length ? save.ownedBuses : [STARTER_BUS_ID],
+      activeBusId: save.activeBusId || STARTER_BUS_ID,
       hasSave: true,
     });
     return true;
@@ -188,6 +241,8 @@ export const useGame = create<GameStore>((set, get) => ({
       tripsCompleted: st.tripsCompleted,
       bestSpeedKph: st.bestSpeedKph,
       totalEarnings: st.totalEarnings,
+      ownedBuses: st.ownedBuses,
+      activeBusId: st.activeBusId,
     };
     writeJson(SAVE_KEY, save);
   },

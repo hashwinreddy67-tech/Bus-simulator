@@ -1,8 +1,9 @@
 "use client";
 
 import * as THREE from "three";
-import { BusVehicle } from "./bus";
+import { BusVehicle, type BusSpec, STARTER_BUS } from "./bus";
 import { createBusMesh } from "./busMesh";
+import { TrafficSystem } from "./traffic";
 import {
   buildWorld,
   ROAD_CENTER_RADIUS,
@@ -16,6 +17,8 @@ import {
 } from "./telemetry";
 import { InputManager, type ActionName } from "./input";
 import { EngineAudio } from "./audio";
+import { PassengerSystem } from "./passengers";
+import { useGame } from "./state";
 
 export interface EngineCallbacks {
   onPauseToggle: () => void;
@@ -31,8 +34,13 @@ export class GameEngine {
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
   private world: World;
+  private traffic: TrafficSystem;
   private bus = new BusVehicle();
   private busMesh!: ReturnType<typeof createBusMesh>;
+  private passengers!: PassengerSystem;
+  private boardAcc = { value: 0 };
+  private revenueFlush = 0;
+  private teService = { arcM: 1e9, waiting: 0, inPosition: false };
   private input: InputManager;
   private audio = new EngineAudio();
   private raf = 0;
@@ -50,7 +58,12 @@ export class GameEngine {
   constructor(
     private canvas: HTMLCanvasElement,
     private cb: EngineCallbacks,
-    options: { renderScale: number; steeringSensitivity: number; sfxVolume: number },
+    options: {
+      renderScale: number;
+      steeringSensitivity: number;
+      sfxVolume: number;
+      busSpec?: BusSpec;
+    },
   ) {
     resetTelemetry();
     this.renderer = new THREE.WebGLRenderer({
@@ -72,6 +85,10 @@ export class GameEngine {
     this.scene.fog = new THREE.Fog(0x9cb8d8, 320, 1500);
 
     this.world = buildWorld(this.scene);
+    this.passengers = new PassengerSystem(this.world.group);
+    this.passengers.seed();
+    this.traffic = new TrafficSystem(this.scene, 34);
+    this.bus = new BusVehicle(options.busSpec ?? STARTER_BUS);
     this.busMesh = createBusMesh(this.bus.spec);
     this.scene.add(this.busMesh.root);
     // Spawn on the ring centreline at angle π/2 (x = R, z = 0), facing the
@@ -229,6 +246,35 @@ export class GameEngine {
     // fence guardrail soft barrier
     this.clampToCorridor();
 
+    // traffic AI
+    this.traffic.isNight = lightsOn;
+    this.traffic.update(dt, st.x, st.z, st.speed);
+    if (this.traffic.collidePlayer(st.x, st.z)) {
+      st.speed *= 0.4; // rough grazing rule; contact resolution in Phase 8
+    }
+
+    // ---- passenger service (Phase 3) ----
+    const nearest = PassengerSystem.nearestStop(st.x, st.z);
+    const inPosition =
+      nearest.arcM < 9 && Math.abs(st.speed) < 0.8 && this.onRoadSurface();
+    this.teService = { arcM: nearest.arcM, waiting: this.passengers.waiting[nearest.stop], inPosition };
+    st.passengers = this.passengers.onboard.length;
+    if (doorsOpen && inPosition && PassengerSystem.stepDue(dt, this.boardAcc)) {
+      const ex = this.passengers.exchange(
+        nearest.stop,
+        true,
+        this.bus.spec.seatCapacity,
+        st.x,
+        st.z,
+      );
+      this.revenueFlush += ex.revenue;
+    }
+    if (this.revenueFlush >= 1) {
+      const earned = Math.floor(this.revenueFlush);
+      this.revenueFlush -= earned;
+      useGame.getState().earn(earned, true);
+    }
+
     // camera
     this.updateCamera();
 
@@ -260,6 +306,9 @@ export class GameEngine {
     te.x = st.x;
     te.z = st.z;
     te.heading = st.heading;
+    te.stopArcM = this.teService.arcM;
+    te.stopWaiting = this.teService.waiting;
+    te.canService = this.teService.inPosition;
 
     this.cb.onTripProgress(st.tripDistance, this.bestSpeed);
 

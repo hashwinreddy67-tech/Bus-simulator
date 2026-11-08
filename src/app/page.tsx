@@ -3,10 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useGame } from "@/game/state";
+import { BUS_FLEET } from "@/game/buses";
 
-/** Branded main menu. Every button performs a real action in Phase 1. */
+/* eslint-disable react-hooks/exhaustive-deps */
+
+/** Branded main menu. Every button performs a real action in Phase 1+. */
 export default function MainMenu() {
   const [hydrate, setHydrate] = useState(false);
+  const fleetCount = BUS_FLEET.length;
   const money = useGame((s) => s.money);
   const distance = useGame((s) => s.distanceMeters);
   const trips = useGame((s) => s.tripsCompleted);
@@ -47,7 +51,14 @@ export default function MainMenu() {
           <Link href="/play" style={{ textDecoration: "none" }}>
             <button className="menu-btn" style={{ borderColor: "#ffb62e" }}>
               {hasSave ? "Continue Game" : "Start Driving"}
-              <small>Free roam · Phase 1 city circuit</small>
+              <small>Free roam · ring highway with live traffic</small>
+            </button>
+          </Link>
+
+          <Link href="/dealership" style={{ textDecoration: "none" }}>
+            <button className="menu-btn">
+              Bus Dealership & My Garage
+              <small>Buy, sell and switch between {fleetCount} bus models</small>
             </button>
           </Link>
 
@@ -63,8 +74,8 @@ export default function MainMenu() {
           </button>
 
           <button className="menu-btn" disabled>
-            DEALERSHIP · COMPANY · PASSENGER AI
-            <small>Coming in Phase 2–3 — roadmap tracked in readme.md</small>
+            PASSENGER AI · COMPANY · MULTIPLAYER
+            <small>Next modules — roadmap in readme.md</small>
           </button>
         </div>
 
