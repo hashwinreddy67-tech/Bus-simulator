@@ -45,6 +45,7 @@ export class GameEngine {
   private clockSpeed = 60; // 1 in-game minute per real second baseline
   private clockHours = 8;
   private steeringSensitivity = 1;
+  private prevSpeed = 0;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -177,9 +178,10 @@ export class GameEngine {
     this.acc += dt;
     const step = 1 / 120;
     const inp = this.input.state;
+    // doors auto-safety-cancel: cannot drive the bus with doors open
+    const doorsOpen = inp.doors && Math.abs(this.bus.state.speed) < 1.2;
     while (this.acc >= step) {
-      const steer =
-        (inp.steerLeft ? 1 : 0) - (inp.steerRight ? 1 : 0);
+      const steer = (inp.steerLeft ? 1 : 0) - (inp.steerRight ? 1 : 0);
       const surface = this.onRoadSurface() ? "road" : "grass";
       this.bus.step(
         step,
@@ -189,6 +191,7 @@ export class GameEngine {
         inp.handbrake,
         inp.cruise ? 60 : null,
         surface === "grass" ? "grass" : "road",
+        doorsOpen,
       );
       this.acc -= step;
     }
@@ -200,18 +203,27 @@ export class GameEngine {
     // lighting + fog by time of day
     this.updateDayNight(dayT, dt);
 
-    // sync bus mesh
+    // sync bus mesh + run every visual subsystem
     const st = this.bus.state;
     this.busMesh.root.position.set(st.x, 0, st.z);
     this.busMesh.root.rotation.y = st.heading;
-    // steer front wheels visually? (torus steering wheel rotates instead)
-    this.busMesh.steeringWheel.rotation.z = -st.steeringAngle * 1.4;
+    this.busMesh.steerVisual(st.steeringAngle);
+    this.busMesh.spinWheels(Math.abs(st.speed) * dt, dt);
+    this.busMesh.applyDoors(doorsOpen, dt);
+    this.busMesh.applyWipers(inp.wipers, dt);
+    this.busMesh.blinkIndicators(inp.indicatorLeft || inp.indicatorRight, dt);
+    const yawRate = (st.speed / this.bus.spec.wheelbase) * Math.tan(st.steeringAngle);
+    const longAccel = (st.speed - this.prevSpeed) / Math.max(dt, 1e-4);
+    this.prevSpeed = st.speed;
+    this.busMesh.applyBodyLean(yawRate * st.speed, longAccel);
 
     // lights
-    const lightsOn = st.engineOn && dayT > 18.5 || st.engineOn && dayT < 6.3;
-    this.busMesh.headlights.forEach((h) => (h.intensity = lightsOn ? 320 : 0));
-    (this.busMesh.brakeLights[0].material as THREE.MeshBasicMaterial).color.setHex(
-      this.input.state.brake > 0.05 || this.input.state.handbrake ? 0xff2211 : 0x5a0d0d,
+    const lightsOn = st.engineOn && (dayT > 18.5 || dayT < 6.3);
+    this.busMesh.setLights(
+      lightsOn,
+      inp.brake > 0.05 || inp.handbrake,
+      st.gearMode === "R",
+      lightsOn, // cabin lights on at night
     );
 
     // fence guardrail soft barrier
@@ -238,7 +250,7 @@ export class GameEngine {
     te.rangeKm = st.fuelLiters * FUEL_RANGE_KM_PER_L;
     te.headlightsOn = lightsOn;
     te.wipersOn = this.input.state.wipers;
-    te.doorsOpen = this.input.state.doors;
+    te.doorsOpen = doorsOpen;
     te.engineOn = st.engineOn;
     te.cruise = this.input.state.cruise;
     te.clockHours = dayT;

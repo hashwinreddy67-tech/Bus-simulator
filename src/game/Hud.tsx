@@ -93,7 +93,8 @@ export default function Hud() {
           <div style={{ marginBottom: 4, letterSpacing: "0.1em" }}>CONTROLS</div>
           W/S drive · A/D steer · SPACE handbrake · R reverse<br />
           G engine · L lights · K horn · X cruise · O doors<br />
-          T wipers · C camera · B reset · ESC pause
+          Z/V indicators · T wipers · C camera · B reset · ESC pause<br />
+          Doors auto-lock while moving — danger!
         </div>
 
         <div className="hud-card" style={{ minWidth: 220 }}>

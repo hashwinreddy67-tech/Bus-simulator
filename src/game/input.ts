@@ -18,6 +18,8 @@ export interface InputState {
   wipers: boolean;
   doors: boolean;
   cruise: boolean;
+  indicatorLeft: boolean;
+  indicatorRight: boolean;
   cameraNext: boolean;
   resetVehicle: boolean;
   pause: boolean;
@@ -37,6 +39,8 @@ export class InputManager {
     wipers: false,
     doors: false,
     cruise: false,
+    indicatorLeft: false,
+    indicatorRight: false,
     cameraNext: false,
     resetVehicle: false,
     pause: false,
@@ -90,6 +94,16 @@ export class InputManager {
       case "KeyO":
         this.state.doors = !this.state.doors;
         this.onAction?.("doors");
+        break;
+      case "KeyZ":
+        this.state.indicatorLeft = !this.state.indicatorLeft;
+        if (this.state.indicatorLeft) this.state.indicatorRight = false;
+        this.onAction?.("indLeft");
+        break;
+      case "KeyV":
+        this.state.indicatorRight = !this.state.indicatorRight;
+        if (this.state.indicatorRight) this.state.indicatorLeft = false;
+        this.onAction?.("indRight");
         break;
       case "KeyC":
         if (e.ctrlKey) break;
@@ -145,4 +159,6 @@ export type ActionName =
   | "cruise"
   | "horn"
   | "pause"
-  | "reset";
+  | "reset"
+  | "indLeft"
+  | "indRight";

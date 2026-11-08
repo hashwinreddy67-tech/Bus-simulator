@@ -89,6 +89,7 @@ export class BusVehicle {
   readonly spec: BusSpec;
   state: VehicleState;
   private shiftTimer = 0;
+  private shiftCut = 0; // torque dip while the gearbox executes a change
   private brakeServo = 0; // simulated air brake buildup
   throttleOut = 0; // audio telemetry
   tireSlip = 0;
@@ -154,14 +155,17 @@ export class BusVehicle {
     handbrake: boolean,
     cruiseTargetKph: number | null,
     onSurface: "road" | "grass" = "road",
+    doorsOpen = false,
   ) {
     const s = this.state;
     const spec = this.spec;
     const g = 9.81;
     const mass = spec.massKg + s.passengers * 72;
+    this.shiftCut = Math.max(0, this.shiftCut - dt);
 
     // ---- cruise control target ----
     let throttleIn = throttle;
+    if (doorsOpen) throttleIn = 0; // safety interlock: no drive with doors open
     if (cruiseTargetKph !== null && s.gearMode === "D" && this.engineRunning) {
       const target = cruiseTargetKph / 3.6;
       const err = target - s.speed;
@@ -199,8 +203,9 @@ export class BusVehicle {
 
       const T = torqueAt(s.rpm, spec);
       const rpmFactor = Math.max(0.15, 1 - Math.max(0, s.rpm - spec.ratedRpm * 0.92) / (spec.ratedRpm * 0.2));
+      const shiftDip = this.shiftCut > 0 ? 0 : 1; // clutch-to-clutch pressure dip
       const maxWheelTorque =
-        T * ratio * spec.finalDrive * 0.9 * throttleIn * rpmFactor;
+        T * ratio * spec.finalDrive * 0.9 * throttleIn * rpmFactor * shiftDip;
       const driveTorqueLimit = mass * g * 0.72 * spec.wheelRadius; // traction cap
       wheelTorque = Math.sign(
         s.gearMode === "R" ? 1 : -1,
@@ -239,6 +244,19 @@ export class BusVehicle {
     // integrate
     const accel = force / mass;
     s.speed += accel * dt;
+
+    // engine braking (coasting decel grows with rpm)
+    if (
+      this.engineRunning &&
+      throttleIn < 0.02 &&
+      s.gearMode !== "N" &&
+      s.gearMode !== "P" &&
+      Math.abs(s.speed) > 0.5
+    ) {
+      const eb = 0.10 + 0.00035 * s.rpm; // m/s²
+      s.speed -= eb * dt * Math.sign(s.speed);
+    }
+
     if (brake * this.brakeServo > 0.1 && Math.abs(s.speed) < 0.35) s.speed = 0;
     s.speed = Math.max(-8, Math.min(s.speed, spec.topSpeedKph / 3.6));
 
@@ -255,9 +273,11 @@ export class BusVehicle {
       if (s.rpm > SHIFT_UP_RPM && s.gearIndex < spec.gears.length - 1) {
         s.gearIndex++;
         this.shiftTimer = SHIFT_COOLDOWN;
+        this.shiftCut = 0.24;
       } else if (s.rpm < SHIFT_DOWN_RPM && s.gearIndex > 0) {
         s.gearIndex--;
         this.shiftTimer = SHIFT_COOLDOWN;
+        this.shiftCut = 0.24;
       }
     }
 
