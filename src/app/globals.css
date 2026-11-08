@@ -1,0 +1,231 @@
+:root {
+  --bg: #07090f;
+  --panel: rgba(13, 18, 30, 0.85);
+  --accent: #ffb62e;
+  --accent2: #ff5c33;
+  --text: #eef1f8;
+  --muted: #8b93a7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+.menu-bg {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1200px 600px at 20% 110%, rgba(255, 92, 51, 0.25), transparent 60%),
+    radial-gradient(1000px 500px at 90% -10%, rgba(255, 182, 46, 0.2), transparent 55%),
+    linear-gradient(180deg, #0b1120 0%, #05070d 100%);
+}
+
+.menu-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.05) 0px,
+      rgba(255, 255, 255, 0.05) 2px,
+      transparent 2px,
+      transparent 46px
+    );
+  opacity: 0.35;
+}
+
+.title-xl {
+  margin: 0;
+  font-size: clamp(44px, 7vw, 92px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  background: linear-gradient(90deg, #ffb62e, #ff5c33);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1.05;
+}
+
+.subtitle {
+  color: var(--muted);
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  font-size: 13px;
+  margin: 10px 0 4px;
+}
+
+.tagline {
+  color: var(--text);
+  letter-spacing: 0.2em;
+  font-size: 15px;
+  opacity: 0.85;
+  margin: 0 0 28px;
+}
+
+.menu-btn {
+  display: flex;
+  width: 100%;
+  min-width: 280px;
+  padding: 14px 20px;
+  margin: 8px 0;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid var(--accent);
+  color: var(--text);
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  text-align: left;
+}
+
+.menu-btn:hover:not(:disabled) {
+  transform: translateX(6px);
+  background: rgba(255, 182, 46, 0.12);
+  border-left-color: var(--accent2);
+}
+
+.menu-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.menu-btn small {
+  display: block;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  margin-top: 3px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 18px 22px;
+  backdrop-filter: blur(6px);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 10px 24px;
+  font-size: 14px;
+}
+
+.stat-grid b {
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.hud-bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 14px 18px;
+  pointer-events: none;
+}
+
+.hud-card {
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  backdrop-filter: blur(6px);
+}
+
+.speedo-num {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.speedo-unit {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+}
+
+.hud-bar {
+  width: 180px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.hud-bar > div {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+
+.hud-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 10px;
+}
+
+.gear-paddle {
+  font-weight: 900;
+  font-size: 30px;
+  color: var(--text);
+  text-align: center;
+  margin-top: 4px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 11, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.overlay .panel {
+  min-width: 320px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 0;
+  font-size: 14px;
+}
